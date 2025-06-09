@@ -12,7 +12,7 @@ public class Tile : MonoBehaviour
     public TileType tileType = TileType.Tile; //default tile type
     public int row; //row position in the maze
     public int column; //column position in the maze
-    public float densityFalloff; //the number at which this tile will not be shown
+    public int densityFalloff; //the number at which this tile will not be shown
 
     // Method to set the tile type
     public void SetTileType(TileType type)
@@ -21,12 +21,12 @@ public class Tile : MonoBehaviour
         // Update the visual representation based on the tile type if needed
     }
 
-    public void CreateTile(int row, int column, TileType type, float density)
+    public void CreateTile(int row, int column, TileType type, int densityFalloff)
     {
         this.row = row;
         this.column = column;
         SetTileType(type);
-        this.densityFalloff = density; // Set the density falloff value
+        this.densityFalloff = densityFalloff; // Set the density falloff value
     }
 
     public void AdjustTile()
