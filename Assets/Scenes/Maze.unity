@@ -445,7 +445,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 322914507}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 333565041}
+        m_TargetAssemblyTypeName: MazeGenerator, Assembly-CSharp
+        m_MethodName: OnSaveMazeButtonClicked
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &322914507
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -665,13 +677,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fae4dc51129d7b742a26b437df2af8ba, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _webServiceUrl: http://www.pd4-examwebservice.com/api
+  _imageURL: http://www.pd4-examsite.com
+  _useSwagger: 0
+  _swaggerURL: http://localhost:5216/api
   mazeName: LongTightMaze
   _rows: {fileID: 775626119}
   _columns: {fileID: 1536622879}
   _tileDensity: {fileID: 1410100395}
   _tileOffset: {fileID: 1936590416}
   tilePrefab: {fileID: 2671912933979353978, guid: d0da47694c72a7a488aab9fbb243e179, type: 3}
-  tileOffset: 2
   tiles:
   - {fileID: 0}
   - {fileID: 0}
@@ -1921,13 +1936,13 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 333565039}
-        m_TargetAssemblyTypeName: 
-        m_MethodName: 
+      - m_Target: {fileID: 333565041}
+        m_TargetAssemblyTypeName: MazeGenerator, Assembly-CSharp
+        m_MethodName: OnLoadMazeButtonClicked
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: 
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
           m_IntArgument: 0
           m_FloatArgument: 0
           m_StringArgument: 

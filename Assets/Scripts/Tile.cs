@@ -2,14 +2,14 @@ using UnityEngine;
 //all values a tile can have
 public enum TileType
 {
-    Wall,
-    Tile
+    W,
+    T
 }
 
 //base template for a tile
 public class Tile : MonoBehaviour
 {
-    public TileType tileType = TileType.Tile; //default tile type
+    public TileType tileType = TileType.T; //default tile type
     public int row; //row position in the maze
     public int column; //column position in the maze
     public int densityFalloff; //the number at which this tile will not be shown
