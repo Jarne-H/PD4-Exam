@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 220597987}
   - component: {fileID: 220597986}
   - component: {fileID: 220597985}
+  - component: {fileID: 220597989}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -227,6 +228,18 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &220597989
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 220597984}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94eaed34b6d728240a2f0f65b501b7b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &309763048
 GameObject:
   m_ObjectHideFlags: 0
@@ -582,13 +595,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.5735764, y: 0, z: 0, w: 0.8191521}
-  m_LocalPosition: {x: 0, y: 24.2, z: -12}
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 24.2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 70, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
 --- !u!114 &330585547
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -686,7 +699,7 @@ MonoBehaviour:
   _columns: {fileID: 1536622879}
   _tileDensity: {fileID: 1410100395}
   _tileOffset: {fileID: 1936590416}
-  tilePrefab: {fileID: 2671912933979353978, guid: d0da47694c72a7a488aab9fbb243e179, type: 3}
+  tilePrefab: {fileID: 1916528896372955518, guid: 6e03095bf45b5784b9a353c504336c9c, type: 3}
   tiles:
   - {fileID: 0}
   - {fileID: 0}

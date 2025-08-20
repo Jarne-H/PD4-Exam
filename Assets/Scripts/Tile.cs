@@ -3,7 +3,8 @@ using UnityEngine;
 public enum TileType
 {
     W,
-    T
+    T,
+    H
 }
 
 //base template for a tile
