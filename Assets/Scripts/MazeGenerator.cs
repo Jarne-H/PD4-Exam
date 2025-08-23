@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -25,7 +25,8 @@ public class MazeGenerator : MonoBehaviour
     private List<(TileType, string, Texture2D)> _tileTypesWithTheirTexture = new List<(TileType, string, Texture2D)>
     {
         (TileType.W, "bricks4.png", null),
-        (TileType.T, "bricks2.png", null)
+        (TileType.T, "bricks2.png", null),
+        (TileType.H, "bricks1.png", null) // Add a hole tile type with its texture name
     };
 
     [Header("Maze Settings")]
@@ -42,16 +43,28 @@ public class MazeGenerator : MonoBehaviour
     private MazeValueSlider _tileDensity;
     [SerializeField]
     private MazeValueSlider _tileOffset;
-    public GameObject tilePrefab;
+    [SerializeField]
+    private GameObject _wallPrefab;
+    [SerializeField]
+    private GameObject _tilePrefab;
+    [SerializeField]
+    private GameObject _holePrefab;
     public List<Tile> tiles = new List<Tile>(); // List to hold the generated tiles
+    //all the edited tiles will be stored in this list, so they can be saved to the web service
+    public List<Tile> editedTiles = new List<Tile>(); // List to hold the edited tiles
 
 #if UNITY_WEBGL && !UNITY_EDITOR
     [DllImport("__Internal")]
     private static extern void GetMazeNameFromPage();
+    private static extern void GetNewMazeNameFromPage();
 #endif
 
     private void Start()
     {
+        if(_useSwagger)
+        {
+            _webServiceUrl = _swaggerURL; // Use the Swagger URL if specified
+        }
         string interop = CharSet.Auto.ToString(); // Ensure the interop is set to Unicode for compatibility
         Debug.Log($"MazeGenerator started with interop: {interop}"); // Log the interop setting
         // Correctly start the coroutines to download textures
@@ -132,96 +145,208 @@ public class MazeGenerator : MonoBehaviour
     }
 
 
-    public void AdjustTileRenderFalloff()
-    {
-        //go over all tiles and adjust the render falloff based on the tileProbability
-        foreach (Tile tile in tiles)
-        {
-            if (tile != null && tile.tileType != TileType.W)
-            {
-                //if tile falloff is below the tileProbability, disable the tile
-                if (tile.densityFalloff < _tileDensity.Value)
-                {
-                    tile.gameObject.SetActive(true); // Enable the tile
-                }
-                else
-                {
-                    tile.gameObject.SetActive(false); // Disable the tile
-                }
-            }
-        }
-        //enable the mazegenerators save button 
-        GUI.enabled = true; // Enable the save button after adjusting the tiles
-    }
+    //public void AdjustTileRenderFalloff()
+    //{
+    //    //go over all tiles and adjust the render falloff based on the tileProbability
+    //    foreach (Tile tile in tiles)
+    //    {
+    //        if (tile != null && tile.tileType != TileType.W)
+    //        {
+    //            //if tile falloff is below the tileProbability, disable the tile
+    //            if (tile.densityFalloff < _tileDensity.Value)
+    //            {
+    //                tile.gameObject.SetActive(true); // Enable the tile
+    //            }
+    //            else
+    //            {
+    //                tile.gameObject.SetActive(false); // Disable the tile
+    //            }
+    //        }
+    //    }
+    //    //enable the mazegenerators save button 
+    //    GUI.enabled = true; // Enable the save button after adjusting the tiles
+    //}
 
     // Method to save the maze to the web service
+
     public IEnumerator SaveMaze()
     {
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        GetMazeNameFromPage();
+        GetNewMazeNameFromPage();
+#endif
+
+        //if newmazename is null or empty, use the maze name from the web page
+        if (string.IsNullOrEmpty(newMazeNameJSValue))
+        {
+            newMazeNameJSValue = $"maze{_rows.Value}x{_columns.Value}-secondary"; // Use the maze name from the web page if available
+        }
+
         //save the maze to the web service
-        string mazename = "maze" + _rows.Value + _columns.Value;
-
-        //http call to webServiceUrl + "maze/post/" + mazename + "," + _rows.Value + "," + _columns.Value
-        string url = $"{_webServiceUrl}/maze/post/maze{_rows.Value}x{_columns.Value},{_rows.Value},{_columns.Value}";
-
-        //unity web request to post the maze data
-        string jsonData = JsonUtility.ToJson(new { name = mazename, rows = _rows.Value, columns = _columns.Value, tileDensity = _tileDensity.Value, tileOffset = _tileOffset.Value });
-        //string response = WebRequest.Post(url, jsonData); // Use the WebRequest class to send the POST request
-        string response = null; // Initialize the response variable
-        yield return StartCoroutine(HTTPPutRequest(url, jsonData, r => response = r)); // Use a coroutine to send the HTTP request asynchronously
-        if (response.Contains("error"))
+        string mazename = "maze" + _rows.Value + "x"+ _columns.Value;
+        //use mazename from the web page if it is not null or empty
+        if (!string.IsNullOrEmpty(mazeNameJSValue))
         {
-            Debug.LogError($"Failed to create maze. Error response: {response}"); // Log the error response from the server
-            yield break; // Exit the coroutine if there is an error in the response
+            mazename = mazeNameJSValue; // Use the maze name from the web page if available
         }
 
+        string url = "";
 
-        //get request to get the maze ID from the database
-        string mazeIdUrl = $"{_webServiceUrl}/maze/get/by-name/maze{_rows.Value}x{_columns.Value}"; // Construct the URL to get the maze ID
-                                                                                                    //string mazeIdResponse = WebRequest.Get(mazeIdUrl); // Use the WebRequest class to send the GET request
-        string mazeIdResponse = null; // Initialize the response variable
-        yield return StartCoroutine(HTTPGetRequest(mazeIdUrl, r => mazeIdResponse = r)); // Use a coroutine to send the HTTP request asynchronously
-
-        // Wait for the coroutine to complete
+        //get maze by mazename from the web service
+        string originalMazeResponse = null; // Initialize the response variable
+        yield return StartCoroutine(HTTPGetRequest($"{_webServiceUrl}/maze/get/by-name/{mazename}", r => originalMazeResponse = r)); // Use a coroutine to send the HTTP request asynchronously
         // Check if the response is empty or null
-        if (string.IsNullOrEmpty(mazeIdResponse))
+        if (string.IsNullOrEmpty(originalMazeResponse))
         {
-            Debug.LogError("Failed to get maze ID. No response from the server. At:" + mazeIdUrl);
-            yield break; // Exit the coroutine if the response is empty
-        }
-
-        // Parse the maze from the response
-        //Maze maze = JsonUtility.FromJson<Maze>(mazeIdResponse);
-        Maze maze = JsonConvert.DeserializeObject<Maze>(mazeIdResponse); // Use Newtonsoft.Json to deserialize the JSON response into a Maze object
-        if (maze == null || maze.Name == "")
-        {
-            Debug.LogError("Failed to parse maze from response. Response: " + mazeIdResponse);
-            yield break; // Exit the coroutine if the maze is null
-        }
-        Debug.Log($"Maze parsed successfully. Maze ID: {maze.MazeId}, Name: {maze.Name}, From: {mazeIdResponse}"); // Log the parsed maze information
-        int mazeId = maze.MazeId; // Get the maze ID from the parsed maze object
-
-        DeleteAllTilesByMazeID(mazeId);
-
-
-        //save all tiles to the web service
-        foreach (Tile tile in tiles)
-        {
-            if (tile != null)
+            //if there is not a maze with the specified name, create a new maze
+            ///CREATE A NEW ORIGINAL MAZE:
+            //unity web request to post the maze data
+            string jsonData = JsonUtility.ToJson(new { name = mazename, rows = _rows.Value, columns = _columns.Value, tileDensity = _tileDensity.Value, tileOffset = _tileOffset.Value });
+            string response = null;
+            //save original maze to the web service
+            url = $"{_webServiceUrl}/maze/post/maze{_rows.Value}x{_columns.Value},{_rows.Value},{_columns.Value}"; // Construct the URL to post the maze data
+            yield return StartCoroutine(HTTPPutRequest(url, jsonData, r => response = r)); // Use a coroutine to send the HTTP request asynchronously
+            if (response.Contains("error"))
             {
-                string tileJson = JsonUtility.ToJson(new { row = tile.row, column = tile.column, type = tile.tileType.ToString(), density = tile.densityFalloff });
-                string tileUrl = $"{_webServiceUrl}/maze-tile/post/{mazeId}/{tile.row},{tile.column},{tile.tileType},{tile.densityFalloff}";
+                Debug.LogError($"Failed to create maze. Error response: {response}"); // Log the error response from the server
+                yield break; // Exit the coroutine if there is an error in the response
+            }
 
-                string tileResponse = null;
-                yield return StartCoroutine(HTTPPutRequest(tileUrl, tileJson, r => tileResponse = r)); // Use a coroutine to send the HTTP request asynchronously
-                if (string.IsNullOrEmpty(tileResponse))
+            Debug.Log($"Maze with name {mazename} does not exist. Creating a new maze."); // Log that a maze with the specified name does not exist
+            url = $"{_webServiceUrl}/maze/post/"; // Construct the URL to create a new maze
+        }
+        else
+        {
+            ///if there already is a maze with that name, remove the modified tiles from the original maze and create a new maze with the edited tiles
+
+            //get the mazeid of the original maze from the response
+            Maze originalMaze = JsonConvert.DeserializeObject<Maze>(originalMazeResponse); // Deserialize the JSON response into a Maze object
+            if (originalMaze == null || originalMaze.MazeId <= 0)
+            {
+                Debug.LogError($"Failed to parse original maze from response: {originalMazeResponse}"); // Log an error if the maze is null or has an invalid ID
+                yield break; // Exit the coroutine if the maze is null or has an invalid ID
+            }
+            int mazeID = originalMaze.MazeId; // Get the maze ID from the parsed maze object
+            //delete the tiles that were edited in the original maze
+            foreach (Tile tile1 in editedTiles)
+            {
+                if (tile1 != null)
                 {
-                    Debug.LogError($"Failed to save tile at ({tile.row}, {tile.column}). No response from the server. At: {tileUrl}");
-                }
-                else
-                {
+                    //delete the tile from the web service/maze-tile/delete/{mazeID}/{x},{y}
+                    string deleteTileUrl = $"{_webServiceUrl}/maze-tile/delete/{mazeID}/{tile1.row},{tile1.column}"; // Construct the URL to delete the tile by its row and column
+                    yield return StartCoroutine(HTTPDeleteRequest(deleteTileUrl, r => { })); // Use a coroutine to send the HTTP request asynchronously
+                    Debug.Log($"Tile at ({tile1.row}, {tile1.column}) deleted successfully from maze ID {mazeID}."); // Log the successful deletion of the tile
                 }
             }
+
+            //check if there is a maze with the new maze name, if so, delete it
+            if (!string.IsNullOrEmpty(newMazeNameJSValue))
+            {
+                string newMazeUrl = $"{_webServiceUrl}/maze/get/by-name/{newMazeNameJSValue}"; // Construct the URL to get the maze by the new name
+                string newMazeResponse = null; // Initialize the response variable
+                yield return StartCoroutine(HTTPGetRequest(newMazeUrl, r => newMazeResponse = r)); // Use a coroutine to send the HTTP request asynchronously
+                if (!string.IsNullOrEmpty(newMazeResponse))
+                {
+                    Maze newlyMadeMaze = JsonConvert.DeserializeObject<Maze>(newMazeResponse); // Deserialize the JSON response into a Maze object
+                    if (newlyMadeMaze != null && newlyMadeMaze.MazeId > 0)
+                    {
+                        //delete the maze with the new maze name
+                        string deleteNewMazeUrl = $"{_webServiceUrl}/maze/delete/by-id/{newlyMadeMaze.MazeId}"; // Construct the URL to delete the maze by its ID
+                        yield return StartCoroutine(HTTPDeleteRequest(deleteNewMazeUrl, r => { })); // Use a coroutine to send the HTTP request asynchronously
+                        Debug.Log($"Old maze with name {newMazeNameJSValue} deleted successfully."); // Log the successful deletion of the old maze
+                    }
+
+                    //delete the tiles of the old maze
+                    url = $"{_webServiceUrl}/maze-tile/delete/all/{newlyMadeMaze.MazeId}"; // Construct the URL to delete all tiles of the old maze
+                    string deleteTilesResponsewww = null; // Initialize the response variable
+                    yield return StartCoroutine(HTTPDeleteRequest(url, r => deleteTilesResponsewww = r)); // Use a coroutine to send the HTTP request asynchronously
+                }
+            }
+
+            //make new maze with new maze name, the edited tiles as their tiles and the original maze ID as the OriginalMazeId
+            //maze/post/secondary-maze/{name},{width},{height},{originalMazeID}
+            url = $"{_webServiceUrl}/maze/post/secondary-maze/{newMazeNameJSValue},{originalMaze.MazeId}";
+            Debug.Log($"Posting new maze with name {newMazeNameJSValue} and original maze ID {originalMaze.MazeId} to URL: {url}");
+            //post the maze to the web service
+            string makeSecondaryMazeResponse = null;
+            yield return StartCoroutine(HTTPPutRequest(url, null, r => makeSecondaryMazeResponse = r)); 
+            //get the id of the new maze
+            string newMazeIdUrl = $"{_webServiceUrl}/maze/get/by-name/{newMazeNameJSValue}"; 
+            string newMazeIdResponse = null; // Initialize the response variable
+            yield return StartCoroutine(HTTPGetRequest(newMazeIdUrl, r => newMazeIdResponse = r)); 
+
+            if (string.IsNullOrEmpty(newMazeIdResponse))
+            {
+                Debug.LogError($"Failed to get new maze ID for maze {newMazeNameJSValue}. No response from the server. At: {newMazeIdUrl}"); // Log an error if the response is empty
+                yield break; // Exit the coroutine if there is no response
+            }
+
+            // Parse the new maze ID from the response
+            Maze newMaze = JsonConvert.DeserializeObject<Maze>(newMazeIdResponse); // Deserialize the JSON response into a Maze object
+
+            //string tileUrl = $"{_webServiceUrl}/maze-tile/post/{mazeId}/{tile.row},{tile.column},{tile.tileType},{tile.densityFalloff}"; 
+            foreach (Tile tile in editedTiles)
+            {
+                url = $"{_webServiceUrl}/maze-tile/post/{newMaze.MazeId}/{tile.row},{tile.column},{tile.tileType},{tile.densityFalloff}"; // Construct the URL to post the tile to the original maze
+                string tileResponse = null; // Initialize the response variable
+                yield return StartCoroutine(HTTPPutRequest(url, null, r => tileResponse = r)); // Use a coroutine to send the HTTP request asynchronously
+                if(string.IsNullOrEmpty(tileResponse))
+                {
+                    Debug.LogError($"Failed to post tile at ({tile.row}, {tile.column}) to maze ID {newMaze.MazeId}. No response from the server. At: {url}"); // Log an error if the response is empty
+                    yield break; // Exit the coroutine if there is no response
+                }
+            }
+
+
+            //post a new maze with newmazename and use the id of the original maze as OriginalMazeId
+            if (!string.IsNullOrEmpty(newMazeNameJSValue))
+            {
+                mazename = newMazeNameJSValue; // Use the new maze name from the web page if available
+            }
+
+            //delete all tiles of the original maze before saving the new maze
+            DeleteAllTilesByMazeID(originalMaze.MazeId); // Call the method to delete all tiles of the original maze
+
+            //save all the tiles of the original maze
+            foreach (Tile tile in tiles)
+            {
+                if (tile != null)
+                {
+                    // Construct the URL to post the tile to the original maze
+                    url = $"{_webServiceUrl}/maze-tile/post/{originalMaze.MazeId}/{tile.row},{tile.column},{tile.tileType},{tile.densityFalloff}"; 
+                    string tileResponse = null; // Initialize the response variable
+                    yield return StartCoroutine(HTTPPutRequest(url, null, r => tileResponse = r)); // Use a coroutine to send the HTTP request asynchronously
+                    if (string.IsNullOrEmpty(tileResponse))
+                    {
+                        Debug.LogError($"Failed to post tile at ({tile.row}, {tile.column}) to maze ID {originalMaze.MazeId}. No response from the server. At: {url}"); // Log an error if the response is empty
+                        yield break; // Exit the coroutine if there is no response
+                    }
+                }
+            }
+
+            //delete all tiles of the secondary maze
+            DeleteAllTilesByMazeID(newMaze.MazeId); // Call the method to delete all tiles of the secondary maze
+
+            //save all the tiles of the secondary maze
+            foreach (Tile tile in editedTiles)
+            {
+                if (tile != null)
+                {
+                    // Construct the URL to post the tile to the secondary maze
+                    url = $"{_webServiceUrl}/maze-tile/post/{newMaze.MazeId}/{tile.row},{tile.column},{tile.tileType},{tile.densityFalloff}"; 
+                    string tileResponse = null; // Initialize the response variable
+                    yield return StartCoroutine(HTTPPutRequest(url, null, r => tileResponse = r)); // Use a coroutine to send the HTTP request asynchronously
+                    if (string.IsNullOrEmpty(tileResponse))
+                    {
+                        Debug.LogError($"Failed to post tile at ({tile.row}, {tile.column}) to maze ID {newMaze.MazeId}. No response from the server. At: {url}"); // Log an error if the response is empty
+                        yield break; // Exit the coroutine if there is no response
+                    }
+                }
+            }
+
         }
+        //save all the tiles to their respective mazes
     }
 
     private IEnumerable DeleteAllTilesByMazeID(int mazeId)
@@ -337,8 +462,20 @@ public class MazeGenerator : MonoBehaviour
             tileType = TileType.T;
         }
 
+        GameObject tileObject = null; // Initialize the GameObject to null
         // Instantiate the tile prefab at the specified position
-        GameObject tileObject = Instantiate(tilePrefab, new Vector3(column, 0, row), Quaternion.identity, transform);
+        if (tileType == TileType.W)
+        {
+            tileObject = Instantiate(_wallPrefab, new Vector3(column, 0, row), Quaternion.identity, transform);
+        }
+        else if (tileType == TileType.T)
+        {
+            tileObject = Instantiate(_tilePrefab, new Vector3(column, 0, row), Quaternion.identity, transform);
+        }
+        else
+        {
+            tileObject = Instantiate(_holePrefab, new Vector3(column, 0, row), Quaternion.identity, transform);
+        }
 
         // Get the Tile component from the instantiated object
         Tile tile = tileObject.GetComponent<Tile>();
@@ -351,16 +488,16 @@ public class MazeGenerator : MonoBehaviour
             tile.CreateTile(row, column, tileType, density);
 
             //set the texture of the tile based on its type
-            tileObject.GetComponentInChildren<Renderer>().material.mainTexture = _tileTypesWithTheirTexture.FirstOrDefault(t => t.Item1 == tileType).Item3; // Set the texture of the tile based on its type
+            tile.GetComponentInChildren<Renderer>().material.mainTexture = _tileTypesWithTheirTexture.FirstOrDefault(t => t.Item1 == tile.tileType).Item3; // Set the texture of the tile based on its type
 
             tiles.Add(tile); // Add the tile to the list
                              // Adjust the tile position based on the offset and keep the middle of the maze at (0, 0)
             tileObject.transform.position = new Vector3(column * _tileOffset.Value - (_columns.Value * _tileOffset.Value / 2), 0, row * _tileOffset.Value - (_rows.Value * _tileOffset.Value / 2));
             //if the tile is not a wall and the density is below the tileProbability, disable the tile
-            if (tile.tileType != TileType.W && tile.densityFalloff > _tileDensity.Value)
-            {
-                tile.gameObject.SetActive(false); // Disable the tile if it doesn't meet the probability
-            }
+            //if (tile.tileType != TileType.W && tile.densityFalloff > _tileDensity.Value)
+            //{
+            //    tile.gameObject.SetActive(false); // Disable the tile if it doesn't meet the probability
+            //}
         }
         else
         {
@@ -381,11 +518,17 @@ public class MazeGenerator : MonoBehaviour
         tiles.Clear(); // Clear the list of tiles after destruction
     }
 
-    private string jsvalue;
+    private string mazeNameJSValue;
+    private string newMazeNameJSValue;
 
     public void RecieveMazeNameFromWebPage(string value)
     {
-        jsvalue = value; // Store the value received from the web page
+        mazeNameJSValue = value; // Store the value received from the web page
+    }
+
+    public void RecieveNewMazeNameFromWebPage(string value)
+    {
+        newMazeNameJSValue = value; // Store the value received from the web page
     }
 
     public IEnumerator LoadMaze()
@@ -395,14 +538,15 @@ public class MazeGenerator : MonoBehaviour
         ///                                  
 #if UNITY_WEBGL && !UNITY_EDITOR
         GetMazeNameFromPage();
+        GetNewMazeNameFromPage(); // Call the JavaScript function to get the maze name from the web page
 #endif
 
         string url = $"{_webServiceUrl}/maze/get/by-name/maze{_rows.Value}x{_columns.Value}";
         //combination of the above code and the new code
         //if jsvalue is not null or empty, use it to get the maze by name
-        if (!string.IsNullOrEmpty(jsvalue))
+        if (!string.IsNullOrEmpty(mazeNameJSValue))
         {
-            url = $"{_webServiceUrl}/maze/get/by-name/{jsvalue}"; // Use the jsvalue to get the maze by name
+            url = $"{_webServiceUrl}/maze/get/by-name/{mazeNameJSValue}"; // Use the jsvalue to get the maze by name
         }
 
         string mazeData = null;
@@ -425,6 +569,7 @@ public class MazeGenerator : MonoBehaviour
         _columns.Value = maze.MazeTiles.Max(mt => mt.ColumnIndex) + 1; // Add 1 because row and column indices are zero-based
         _tileDensity.Value = maze.Density; // Set the tile density value from the maze data
 
+
     }
 
     public void GenerateLoadedMaze(MazeTile[] loadedMazeTiles, float tileDensity)
@@ -435,8 +580,20 @@ public class MazeGenerator : MonoBehaviour
         {
             if (loadedTile != null)
             {
-                // Instantiate the tile prefab at the specified position
-                GameObject tileObject = Instantiate(tilePrefab, new Vector3(loadedTile.ColumnIndex * _tileOffset.Value - (_columns.Value * _tileOffset.Value / 2), 0, loadedTile.RowIndex * _tileOffset.Value - (_rows.Value * _tileOffset.Value / 2)), Quaternion.identity, transform);
+                GameObject tileObject = null; // Initialize the GameObject to null
+                // Determine the tile type based on the loaded data
+                if(loadedTile.TileType == "W")
+                {
+                    tileObject = Instantiate(_wallPrefab, new Vector3(loadedTile.ColumnIndex, 0, loadedTile.RowIndex), Quaternion.identity, transform);
+                }
+                else if (loadedTile.TileType == "T")
+                {
+                    tileObject = Instantiate(_tilePrefab, new Vector3(loadedTile.ColumnIndex, 0, loadedTile.RowIndex), Quaternion.identity, transform);
+                }
+                else
+                {
+                    tileObject = Instantiate(_holePrefab, new Vector3(loadedTile.ColumnIndex, 0, loadedTile.RowIndex), Quaternion.identity, transform);
+                }
 
                 // Get the Tile component from the instantiated object
                 Tile tile = tileObject.GetComponent<Tile>();
@@ -451,11 +608,11 @@ public class MazeGenerator : MonoBehaviour
                     // Adjust the tile position based on the offset and keep the middle of the maze at (0, 0)
                     tileObject.transform.position = new Vector3(loadedTile.ColumnIndex * _tileOffset.Value - (_columns.Value * _tileOffset.Value / 2), 0, loadedTile.RowIndex * _tileOffset.Value - (_rows.Value * _tileOffset.Value / 2));
                     //if the tile is not a wall and the density is below the tileProbability, disable the tile
-                    if (tile.tileType != TileType.W && tile.densityFalloff > _tileDensity.Value)
-                    {
-                        //set the texture of the tile based on its type
-                        tile.gameObject.SetActive(false); // Disable the tile if it doesn't meet the probability
-                    }
+                    //if (tile.tileType != TileType.W && tile.densityFalloff > _tileDensity.Value)
+                    //{
+                    //    //set the texture of the tile based on its type
+                    //    tile.gameObject.SetActive(false); // Disable the tile if it doesn't meet the probability
+                    //}
                 }
                 else
                 {
@@ -475,7 +632,56 @@ public class MazeGenerator : MonoBehaviour
     {
         StartCoroutine(LoadMaze());
     }
+
+    public void AdjustTile(int row, int column, TileType newType, int densityFallOff)
+    {
+        //get the tile at the specified row and column
+        Tile tile = tiles.FirstOrDefault(t => t.row == row && t.column == column);
+        if (tile != null)
+        {
+            //delete the old object and create a new one with the new type and density falloff
+            Destroy(tile.gameObject); // Destroy the old tile GameObject
+            //remove it from the list
+            tiles.Remove(tile); // Remove the old tile from the list
+            // Create a new tile with the specified type and density falloff
+            GameObject newTileObject = null; // Initialize the new GameObject to null
+            if (newType == TileType.W)
+            {
+                newTileObject = Instantiate(_wallPrefab, new Vector3(column, 0, row), Quaternion.identity, transform);
+            }
+            else if (newType == TileType.T)
+            {
+                newTileObject = Instantiate(_tilePrefab, new Vector3(column, 0, row), Quaternion.identity, transform);
+            }
+            else
+            {
+                newTileObject = Instantiate(_holePrefab, new Vector3(column, 0, row), Quaternion.identity, transform);
+            }
+            // Get the Tile component from the new instantiated object
+            Tile newTile = newTileObject.GetComponent<Tile>();
+            // If the Tile component is found, set its properties
+            if(newTile != null)
+            {
+                newTile.CreateTile(row, column, newType, densityFallOff); // Create the new tile with the specified properties
+                // Set the texture of the new tile based on its type
+                newTile.GetComponentInChildren<Renderer>().material.mainTexture = _tileTypesWithTheirTexture.FirstOrDefault(t => t.Item1 == newTile.tileType).Item3;
+                tiles.Add(newTile); // Add the new tile to the list
+                // Adjust the tile position based on the offset and keep the middle of the maze at (0, 0)
+                newTileObject.transform.position = new Vector3(column * _tileOffset.Value - (_columns.Value * _tileOffset.Value / 2), 0, row * _tileOffset.Value - (_rows.Value * _tileOffset.Value / 2));
+            }
+            else
+            {
+                Debug.LogError("Tile component not found on the new tile prefab.");
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"No tile found at ({row}, {column}) to adjust.");
+        }
+    }
 }
+
+
 
 [System.Serializable]
 public class Maze
@@ -491,6 +697,8 @@ public class Maze
 
     [JsonProperty("density")]
     public int Density { get; set; }
+
+    public int? OriginalMazeId { get; set; }
 
     [JsonProperty("gameSessions")]
     public GameSession[] GameSessions { get; set; }
@@ -510,7 +718,6 @@ public class MazeData
     public int density; // Density of the maze, can be used for rendering or other purposes
 }
 
-
 [Serializable]
 public class TileData
 {
@@ -523,7 +730,7 @@ public class TileData
 }
 //-----------------------------------
 
-[System.Serializable]
+[Serializable]
 public class MazeTile
 {
     [JsonProperty("tileId")]

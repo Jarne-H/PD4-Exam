@@ -32,7 +32,13 @@ public class Tile : MonoBehaviour
 
     public void AdjustTile()
     {
-        // Optionally, initialize the tile here if needed
-
+        //cycle trough tile types on click
+        //get current index of tile type
+        int currentIndex = (int)tileType;
+        //increment index and wrap around if necessary
+        currentIndex = (currentIndex + 1) % System.Enum.GetValues(typeof(TileType)).Length;
+        //log the new tile type
+        //set new tile type
+        SetTileType((TileType)currentIndex);
     }
 }

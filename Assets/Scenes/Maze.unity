@@ -692,14 +692,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _webServiceUrl: http://www.pd4-examwebservice.com/api
   _imageURL: http://www.pd4-examsite.com
-  _useSwagger: 0
+  _useSwagger: 1
   _swaggerURL: http://localhost:5216/api
   mazeName: LongTightMaze
   _rows: {fileID: 775626119}
   _columns: {fileID: 1536622879}
   _tileDensity: {fileID: 1410100395}
   _tileOffset: {fileID: 1936590416}
-  tilePrefab: {fileID: 1916528896372955518, guid: 6e03095bf45b5784b9a353c504336c9c, type: 3}
+  _wallPrefab: {fileID: 4594871912242510161, guid: 9cff86647ab0aca41bc420e62d98217f, type: 3}
+  _tilePrefab: {fileID: 1916528896372955518, guid: 6e03095bf45b5784b9a353c504336c9c, type: 3}
+  _holePrefab: {fileID: 7847975036434165785, guid: cd0dc9360222f944e8cc61902abe7a0d, type: 3}
   tiles:
   - {fileID: 0}
   - {fileID: 0}
@@ -773,6 +775,7 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
+  editedTiles: []
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
