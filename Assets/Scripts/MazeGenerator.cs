@@ -86,30 +86,8 @@ public class MazeGenerator : MonoBehaviour
             Debug.LogError($"No texture name found for tile type {tileType}. Please check the _tileTypesWithTheirTexture list.");
             yield break; // Exit if no texture name is found
         }
-        //////////Debug.Log($"Loading texture for tile type {tileType} with image data: {imageData}"); // Log the texture name being loaded
-        //////////get request to /images/get/by-name/{textureName} using HTTPGetRequest
-        ////////string url = $"{_webServiceUrl}/images/get/by-name/{imageData}"; // Construct the URL to get the texture by name 
-        ///////////images/get/by-name/
-        ////////string textureData = null; // Initialize the texture data variable
-        ////////                           // Use a coroutine to send the HTTP request asynchronously
-        ////////yield return StartCoroutine(HTTPGetRequest(url, r => textureData = r)); // Use a coroutine to send the HTTP request asynchronously
-        ////////                                                                        //catch the response from the web service
-        ////////Debug.Log($"Received texture data for tile type {tileType}: {textureData}"); // Log the received texture data
-        ////////if (string.IsNullOrEmpty(textureData))
-        ////////{
-        ////////    Debug.LogError($"Failed to load texture data for tile type {tileType}. No response from the server. At: {url}");
-        ////////    yield break; // Exit if the texture data is empty or null
-        ////////}
-
-        //////////extract the datatype image from the textureData using newtonsoft.json
-        ////////DataTypes.Image textureDataObj = JsonConvert.DeserializeObject<DataTypes.Image>(textureData); // Deserialize the JSON response into an Image object
-        ////////if (textureDataObj == null || string.IsNullOrEmpty(textureDataObj.Link) || string.IsNullOrEmpty(textureDataObj.Name))
-        ////////{
-        ////////    Debug.LogError($"Failed to parse texture data for tile type {tileType}. Response: {textureData}");
-        ////////    yield break; // Exit if the texture data object is null or has invalid properties
-        ////////}
-
-        ////////string textureUrl = $"{_imageURL}/{textureDataObj.Link}/{textureDataObj.Name}"; // Construct the URL to get the texture
+        
+        // Construct the URL to get the texture
         string textureUrl = $"{_imageURL}/images/{imageData}"; // Construct the URL to get the texture by name
         //Debug.Log($"Downloading texture for tile type {tileType} from URL: {textureUrl}"); // Log the URL from which the texture will be downloaded
 
@@ -202,7 +180,20 @@ public class MazeGenerator : MonoBehaviour
             //if there is not a maze with the specified name, create a new maze
             ///CREATE A NEW ORIGINAL MAZE:
             //unity web request to post the maze data
-            string jsonData = JsonUtility.ToJson(new { name = mazename, rows = _rows.Value, columns = _columns.Value, tileDensity = _tileDensity.Value, tileOffset = _tileOffset.Value });
+            //string jsonData = JsonUtility.ToJson(new { name = mazename, rows = _rows.Value, columns = _columns.Value, tileDensity = _tileDensity.Value, tileOffset = _tileOffset.Value });
+            var mazeData = new
+            {
+                name = mazename,
+                rows = _rows.Value,
+                columns = _columns.Value,
+                tileDensity = _tileDensity.Value,
+                tileOffset = _tileOffset.Value
+
+            };
+            string jsonData = JsonConvert.SerializeObject(mazeData); // Serialize the maze data to JSON using Newtonsoft.Json
+            //Debug.Log($"Serialized maze data to JSON: {jsonData}"); // Log the serialized JSON data name = mazename, rows = _rows.Value, columns = _columns.Value, tileDensity = _tileDensity.Value, tileOffset = _tileOffset.Value
+            Debug.Log($"Data to be sent: name = {mazename}, rows = {_rows.Value}, columns = {_columns.Value}, tileDensity = {_tileDensity.Value}, tileOffset = {_tileOffset.Value}");
+            Debug.Log($"Posting new maze with name {mazename} to URL: {_webServiceUrl}/maze/post/maze{_rows.Value}x{_columns.Value},{_rows.Value},{_columns.Value} with data: {jsonData}");
             string response = null;
             //save original maze to the web service
             url = $"{_webServiceUrl}/maze/post/maze{_rows.Value}x{_columns.Value},{_rows.Value},{_columns.Value}"; // Construct the URL to post the maze data
@@ -503,6 +494,18 @@ public class MazeGenerator : MonoBehaviour
         {
             Debug.LogError("Tile component not found on the tile prefab.");
         }
+
+        TileClicker tileClicker = tileObject.GetComponent<TileClicker>();
+
+        if(tileClicker != null)
+        {
+            tileClicker = tileObject.AddComponent<TileClicker>(); // Add the TileClicker component if not already present
+            tileClicker.mazeGenerator = this; // Set the reference to the MazeGenerator
+        }
+        else
+        {
+            Debug.LogError("TileClicker component not found on the tile prefab.");
+        }
     }
 
     private void DestroyAllPreviousTiles()
@@ -521,12 +524,12 @@ public class MazeGenerator : MonoBehaviour
     private string mazeNameJSValue;
     private string newMazeNameJSValue;
 
-    public void RecieveMazeNameFromWebPage(string value)
+    public void ReceiveMazeNameFromWebPage(string value)
     {
         mazeNameJSValue = value; // Store the value received from the web page
     }
 
-    public void RecieveNewMazeNameFromWebPage(string value)
+    public void ReceiveNewMazeNameFromWebPage(string value)
     {
         newMazeNameJSValue = value; // Store the value received from the web page
     }
@@ -607,12 +610,6 @@ public class MazeGenerator : MonoBehaviour
                     tiles.Add(tile); // Add the tile to the list
                     // Adjust the tile position based on the offset and keep the middle of the maze at (0, 0)
                     tileObject.transform.position = new Vector3(loadedTile.ColumnIndex * _tileOffset.Value - (_columns.Value * _tileOffset.Value / 2), 0, loadedTile.RowIndex * _tileOffset.Value - (_rows.Value * _tileOffset.Value / 2));
-                    //if the tile is not a wall and the density is below the tileProbability, disable the tile
-                    //if (tile.tileType != TileType.W && tile.densityFalloff > _tileDensity.Value)
-                    //{
-                    //    //set the texture of the tile based on its type
-                    //    tile.gameObject.SetActive(false); // Disable the tile if it doesn't meet the probability
-                    //}
                 }
                 else
                 {
