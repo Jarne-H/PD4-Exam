@@ -61,7 +61,7 @@ public class MazeGenerator : MonoBehaviour
 
     private void Start()
     {
-        if(_useSwagger)
+        if (_useSwagger)
         {
             _webServiceUrl = _swaggerURL; // Use the Swagger URL if specified
         }
@@ -86,7 +86,7 @@ public class MazeGenerator : MonoBehaviour
             Debug.LogError($"No texture name found for tile type {tileType}. Please check the _tileTypesWithTheirTexture list.");
             yield break; // Exit if no texture name is found
         }
-        
+
         // Construct the URL to get the texture
         string textureUrl = $"{_imageURL}/images/{imageData}"; // Construct the URL to get the texture by name
         //Debug.Log($"Downloading texture for tile type {tileType} from URL: {textureUrl}"); // Log the URL from which the texture will be downloaded
@@ -162,7 +162,7 @@ public class MazeGenerator : MonoBehaviour
         }
 
         //save the maze to the web service
-        string mazename = "maze" + _rows.Value + "x"+ _columns.Value;
+        string mazename = "maze" + _rows.Value + "x" + _columns.Value;
         //use mazename from the web page if it is not null or empty
         if (!string.IsNullOrEmpty(mazeNameJSValue))
         {
@@ -261,11 +261,11 @@ public class MazeGenerator : MonoBehaviour
             Debug.Log($"Posting new maze with name {newMazeNameJSValue} and original maze ID {originalMaze.MazeId} to URL: {url}");
             //post the maze to the web service
             string makeSecondaryMazeResponse = null;
-            yield return StartCoroutine(HTTPPutRequest(url, null, r => makeSecondaryMazeResponse = r)); 
+            yield return StartCoroutine(HTTPPutRequest(url, null, r => makeSecondaryMazeResponse = r));
             //get the id of the new maze
-            string newMazeIdUrl = $"{_webServiceUrl}/maze/get/by-name/{newMazeNameJSValue}"; 
+            string newMazeIdUrl = $"{_webServiceUrl}/maze/get/by-name/{newMazeNameJSValue}";
             string newMazeIdResponse = null; // Initialize the response variable
-            yield return StartCoroutine(HTTPGetRequest(newMazeIdUrl, r => newMazeIdResponse = r)); 
+            yield return StartCoroutine(HTTPGetRequest(newMazeIdUrl, r => newMazeIdResponse = r));
 
             if (string.IsNullOrEmpty(newMazeIdResponse))
             {
@@ -282,7 +282,7 @@ public class MazeGenerator : MonoBehaviour
                 url = $"{_webServiceUrl}/maze-tile/post/{newMaze.MazeId}/{tile.row},{tile.column},{tile.tileType},{tile.densityFalloff}"; // Construct the URL to post the tile to the original maze
                 string tileResponse = null; // Initialize the response variable
                 yield return StartCoroutine(HTTPPutRequest(url, null, r => tileResponse = r)); // Use a coroutine to send the HTTP request asynchronously
-                if(string.IsNullOrEmpty(tileResponse))
+                if (string.IsNullOrEmpty(tileResponse))
                 {
                     Debug.LogError($"Failed to post tile at ({tile.row}, {tile.column}) to maze ID {newMaze.MazeId}. No response from the server. At: {url}"); // Log an error if the response is empty
                     yield break; // Exit the coroutine if there is no response
@@ -305,7 +305,7 @@ public class MazeGenerator : MonoBehaviour
                 if (tile != null)
                 {
                     // Construct the URL to post the tile to the original maze
-                    url = $"{_webServiceUrl}/maze-tile/post/{originalMaze.MazeId}/{tile.row},{tile.column},{tile.tileType},{tile.densityFalloff}"; 
+                    url = $"{_webServiceUrl}/maze-tile/post/{originalMaze.MazeId}/{tile.row},{tile.column},{tile.tileType},{tile.densityFalloff}";
                     string tileResponse = null; // Initialize the response variable
                     yield return StartCoroutine(HTTPPutRequest(url, null, r => tileResponse = r)); // Use a coroutine to send the HTTP request asynchronously
                     if (string.IsNullOrEmpty(tileResponse))
@@ -325,7 +325,7 @@ public class MazeGenerator : MonoBehaviour
                 if (tile != null)
                 {
                     // Construct the URL to post the tile to the secondary maze
-                    url = $"{_webServiceUrl}/maze-tile/post/{newMaze.MazeId}/{tile.row},{tile.column},{tile.tileType},{tile.densityFalloff}"; 
+                    url = $"{_webServiceUrl}/maze-tile/post/{newMaze.MazeId}/{tile.row},{tile.column},{tile.tileType},{tile.densityFalloff}";
                     string tileResponse = null; // Initialize the response variable
                     yield return StartCoroutine(HTTPPutRequest(url, null, r => tileResponse = r)); // Use a coroutine to send the HTTP request asynchronously
                     if (string.IsNullOrEmpty(tileResponse))
@@ -497,7 +497,7 @@ public class MazeGenerator : MonoBehaviour
 
         TileClicker tileClicker = tileObject.GetComponent<TileClicker>();
 
-        if(tileClicker != null)
+        if (tileClicker != null)
         {
             tileClicker = tileObject.AddComponent<TileClicker>(); // Add the TileClicker component if not already present
             tileClicker.mazeGenerator = this; // Set the reference to the MazeGenerator
@@ -585,7 +585,7 @@ public class MazeGenerator : MonoBehaviour
             {
                 GameObject tileObject = null; // Initialize the GameObject to null
                 // Determine the tile type based on the loaded data
-                if(loadedTile.TileType == "W")
+                if (loadedTile.TileType == "W")
                 {
                     tileObject = Instantiate(_wallPrefab, new Vector3(loadedTile.ColumnIndex, 0, loadedTile.RowIndex), Quaternion.identity, transform);
                 }
@@ -630,6 +630,66 @@ public class MazeGenerator : MonoBehaviour
         StartCoroutine(LoadMaze());
     }
 
+    public void OnDeleteMazeButtonClicked()
+    {
+        //Coroutine to delete the maze by its name
+        StartCoroutine(DeleteMazeByName());
+    }
+
+    private IEnumerator DeleteMazeByName()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        GetMazeNameFromPage();
+        GetNewMazeNameFromPage();
+#endif
+
+        string mazename = "maze" + _rows.Value + "x" + _columns.Value;
+        //use mazename from the web page if it is not null or empty
+        if (!string.IsNullOrEmpty(mazeNameJSValue))
+        {
+            mazename = mazeNameJSValue; // Use the maze name from the web page if available
+        }
+        string url = $"{_webServiceUrl}/maze/get/by-name/{mazename}";
+        string mazeData = null;
+        yield return StartCoroutine(HTTPGetRequest(url, r => mazeData = r)); // Use a coroutine to send the HTTP request asynchronously
+        if (string.IsNullOrEmpty(mazeData))
+        {
+            Debug.LogError("Failed to load maze data for deletion. No response from the server. At: " + url);
+            yield break;
+        }
+        Debug.Log($"Maze data loaded successfully for deletion: {mazeData}");
+        //get the maze from the maze data
+        Maze maze = JsonConvert.DeserializeObject<Maze>(mazeData); // Deserialize the JSON response into a Maze object
+        if (maze == null || maze.MazeId <= 0)
+        {
+            Debug.LogError($"Failed to parse maze from response: {mazeData}"); // Log an error if the maze is null or has an invalid ID
+            yield break; // Exit the coroutine if the maze is null or has an invalid ID
+        }
+        //delete all tiles of the maze
+        string deleteTilesUrl = $"{_webServiceUrl}/maze-tile/delete/all/{maze.MazeId}";
+        string deleteTilesResponse = null;
+        yield return StartCoroutine(HTTPDeleteRequest(deleteTilesUrl, r => deleteTilesResponse = r)); // Use a coroutine to send the HTTP request asynchronously
+        if (string.IsNullOrEmpty(deleteTilesResponse))
+        {
+            Debug.LogError($"Failed to delete tiles for maze ID {maze.MazeId}. No response from the server. At: {deleteTilesUrl}");
+            yield break; // Exit the coroutine if there is no response
+        }
+        Debug.Log($"Tiles deleted successfully for maze ID {maze.MazeId}. Response: {deleteTilesResponse}"); // Log the successful deletion of tiles
+        //delete the maze by its ID
+        string deleteMazeUrl = $"{_webServiceUrl}/maze/delete/by-id/{maze.MazeId}";
+        string deleteMazeResponse = null;
+        yield return StartCoroutine(HTTPDeleteRequest(deleteMazeUrl, r => deleteMazeResponse = r)); // Use a coroutine to send the HTTP request asynchronously
+        if (string.IsNullOrEmpty(deleteMazeResponse))
+        {
+            Debug.LogError($"Failed to delete maze ID {maze.MazeId}. No response from the server. At: {deleteMazeUrl}");
+            yield break; // Exit the coroutine if there is no response
+        }
+        Debug.Log($"Maze ID {maze.MazeId} deleted successfully. Response: {deleteMazeResponse}"); // Log the successful deletion of the maze
+        DestroyAllPreviousTiles(); // Clear existing tiles after deletion
+        tiles.Clear(); // Clear the list of tiles
+        editedTiles.Clear(); // Clear the list of edited tiles
+    }
+
     public void AdjustTile(int row, int column, TileType newType, int densityFallOff)
     {
         //get the tile at the specified row and column
@@ -657,7 +717,7 @@ public class MazeGenerator : MonoBehaviour
             // Get the Tile component from the new instantiated object
             Tile newTile = newTileObject.GetComponent<Tile>();
             // If the Tile component is found, set its properties
-            if(newTile != null)
+            if (newTile != null)
             {
                 newTile.CreateTile(row, column, newType, densityFallOff); // Create the new tile with the specified properties
                 // Set the texture of the new tile based on its type
