@@ -204,7 +204,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 333565041}
         m_TargetAssemblyTypeName: MazeGenerator, Assembly-CSharp
-        m_MethodName: OnLoadMazeButtonClicked
+        m_MethodName: OnDeleteMazeButtonClicked
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

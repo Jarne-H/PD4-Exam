@@ -149,7 +149,6 @@ public class MazeGenerator : MonoBehaviour
 
     public IEnumerator SaveMaze()
     {
-
 #if UNITY_WEBGL && !UNITY_EDITOR
         GetMazeNameFromPage();
         GetNewMazeNameFromPage();
